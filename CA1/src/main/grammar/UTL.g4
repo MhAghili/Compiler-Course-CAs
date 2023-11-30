@@ -13,9 +13,39 @@ statement
     | tryCatchStatement
     | scheduleStatement
     | printStatement
-    | functionCall {System.out.println("FunctionCall");}
+    | functionCall SEMICOLON {System.out.println("FunctionCall");}
     | assignment
+    | varuse
+    | break_continue
+    | exceptionDec
+    | throwExcep
+    | return
     ;
+
+return
+    :RETURN expr? SEMICOLON
+    ;
+throwExcep:
+    THROW (ID | exception_func) SEMICOLON
+    ;
+
+exceptionDec:
+    EXCEPTION
+    name = ID {System.out.println("VarDec:" + $name.text); }
+    (ASSIGN (exception_func) {System.out.println("Operator:="); })?
+    SEMICOLON
+    ;
+
+break_continue:
+    BREAK {System.out.println("Control:break");} SEMICOLON
+    |CONTINUE{System.out.println("Control:continue");} SEMICOLON
+    ;
+
+varuse:
+    ID expr SEMICOLON
+    |ID DOT preDefined_var LPAR funcArg? RPAR SEMICOLON
+    ;
+
 
 orderDeclaration
     :ORDER
@@ -35,7 +65,7 @@ varDeclaration
     : varMethod
       type
       name = ID { System.out.println("VarDec:" + $name.text); }
-      (ASSIGN (expr | orderDeclaration | tradeClassInstance) { System.out.println("Operator:="); })?
+      (ASSIGN (expr | orderDeclaration | tradeClassInstance | observeDec) { System.out.println("Operator:="); })?
       SEMICOLON
     ;
 
@@ -43,21 +73,51 @@ arrDeclaration
     : varMethod
       type
       (LBRACKET expr RBRACKET name = ID  {System.out.println("ArrayDec:" + $name.text + ":" + $expr.text);})?
-      (ASSIGN (expr | orderDeclaration | tradeClassInstance) { System.out.println("Operator:="); })?
+      (ASSIGN (expr | orderDeclaration | tradeClassInstance | candleDec) { System.out.println("Operator:="); })?
       SEMICOLON
     ;
 
+candleDec:
+    GETCANDLE
+    LPAR
+    expr
+    RPAR
+    ;
+
+observeDec:
+     OBSERVE
+     LPAR
+     expr
+     RPAR
+     ;
+
+exception_func:
+    EXCEPTION LPAR name = INT_VAL { System.out.println("ErrorControl:"+ $name.text); } COMMA STRING_VAL RPAR
+    ;
 
 tradeClassInstance:
-    ID DOT trade_preDefined_var;
+    ID DOT preDefined_var;
 
-trade_preDefined_var
+preDefined_var
     : BID
     | ASK
     |DIGITS
     |CANDLE
+    |CLOSE
+    |OPEN
+    |TYPE
     ;
 
+
+
+array_predefined_var
+    :TIME
+    |OPEN
+    |CLOSE
+    |HIGH
+    |LOW
+    |VOLUME
+    ;
 
 varMethod
     : STATIC
@@ -67,7 +127,7 @@ varMethod
 
 methodDeclaration
     :type
-     funcName
+     funcdec_name
      LPAR
      parameterList?
      RPAR
@@ -75,12 +135,20 @@ methodDeclaration
      methodBody
     ;
 
-funcName
-    :ONINIT
-    | ONSTART
-    | REFRESHRATE
-    | ID
+pre_def_func
+
+    : REFRESHRATE
+    | CONNECT
+    | GETCANDLE
+
     ;
+
+funcdec_name
+    : ONINIT
+    | ONSTART
+    | MAIN
+    | name = ID {System.out.println("MethodDec:" + $name.text);}
+;
 
 parameterList
     : parameter (COMMA parameter)*
@@ -104,15 +172,15 @@ ifStatement
     ;
 
 ifBody
-      : LBRACE statement* RBRACE (ELSE{ System.out.println("Conditional:else");} statement*)?
+      : LBRACE? statement* RBRACE? (ELSE{ System.out.println("Conditional:else");} LBRACE? statement* RBRACE?)?
       ;
 
 whileStatement
-    : WHILE LPAR condition RPAR statement
+    : WHILE{System.out.println("Loop:while");} LPAR condition RPAR LBRACE statement* RBRACE
     ;
 
 forStatement
-    : FOR LPAR forInit? SEMICOLON forCondition? SEMICOLON forUpdate? RPAR statement
+    : FOR{{System.out.println("Loop:for");}} LPAR forInit? forCondition? SEMICOLON forUpdate* RPAR LBRACE statement* RBRACE
     ;
 
 forInit
@@ -128,15 +196,20 @@ forUpdate
     ;
 
 tryCatchStatement
-    : TRY statement+ CATCH exceptionType LBRACE statement* RBRACE
+    : TRY LBRACE statement+ RBRACE CATCH exceptionType ID LBRACE statement* RBRACE
     ;
 
 scheduleStatement
-    : SCHEDULE LPAR (tradeExpression (PREORDER | PARALLEL) tradeExpression)* RPAR
+    : SCHEDULE{System.out.println("ConcurrencyControl:Schedule");}  schedule_expr (PREORDER | PARALLEL) schedule_expr SEMICOLON
     ;
 
+schedule_expr
+    :LPAR?(tradeExpression? (PREORDER | PARALLEL)? tradeExpression?)RPAR?
+    ;
+
+
 printStatement
-    : PRINT LPAR expr RPAR SEMICOLON
+    : PRINT{{System.out.println("Built-in:print");}} LPAR expr RPAR SEMICOLON
     ;
 
 condition
@@ -144,11 +217,15 @@ condition
     ;
 
 assignment
-    : ID ASSIGN{{ System.out.println("Operator:="); }} expr SEMICOLON
+    : (ID | arrayAccess) ASSIGN{{ System.out.println("Operator:="); }} (array_assign|expr )  SEMICOLON
     ;
 
+array_assign:
+    arrayAccess DOT array_predefined_var;
+
+
 functionCall
-    : funcName LPAR RPAR SEMICOLON
+    : (pre_def_func|ID) LPAR funcArg? RPAR
 ;
 
 funcArg
@@ -241,7 +318,9 @@ expr_arith_mult_div_mod_
     ;
 
 expr_unary_plus_minus_not
-    : PLUS expr_other { System.out.println("Operator:+"); }
+    : DOUBLE_PLUS  { System.out.println("Operator:++"); }
+    | DOUBLE_MINUS  { System.out.println("Operator:--"); }
+    | PLUS expr_other { System.out.println("Operator:+"); }
     | MINUS expr_other { System.out.println("Operator:-"); }
     | NOT expr_other { System.out.println("Operator:!"); }
     | expr_other
@@ -250,18 +329,17 @@ expr_unary_plus_minus_not
 expr_other
     : LPAR expr RPAR
     | arrayAccess
+    | functionCall
     | ID
+    | classInstance
     | primitive_val
     ;
 
 
-//leftHandSide
-//    : ID
-//    | primitive_val
-//    | arrayAccess
-//
-//    ;
-//
+classInstance:
+    (ID | exception_func ) DOT preDefined_var
+    ;
+
 arrayAccess
     : ID LBRACKET expr RBRACKET
     ;
@@ -286,7 +364,7 @@ primitive_val
 //keywords:
 
 PARALLEL: 'parallel';
-PREORDER:'Preorder';
+PREORDER:'preorder';
 TERMINATE:'Terminate';
 GETCANDLE:'GetCandle';
 REFRESHRATE:'RefreshRate';
@@ -325,7 +403,7 @@ IF : 'if';
 ELSE : 'else';
 BREAK : 'break';
 CONTINUE : 'continue';
-PRINT : 'print';
+PRINT : 'Print';
 
 // Type
 
@@ -339,7 +417,7 @@ DOUBLE:'double';
 
 
 // Type Val
-ID : [a-z] [a-zA-Z0-9_]*; // Updated rule to include digits after the first character
+ID : [a-zA-Z] [a-zA-Z0-9_]*;
 INT_VAL : [0-9]+;
 FLOAT_VAL : [0-9]+ '.' [0-9]+;
 STRING_VAL : '"' ~('\r' | '\n' | '"')* '"';
