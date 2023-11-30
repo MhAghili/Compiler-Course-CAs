@@ -6,12 +6,15 @@ program : statement+;
 statement
     : varDeclaration
     | methodDeclaration
+    | arrDeclaration
     | ifStatement
     | whileStatement
     | forStatement
     | tryCatchStatement
     | scheduleStatement
     | printStatement
+    | functionCall {System.out.println("FunctionCall");}
+    | assignment
     ;
 
 orderDeclaration
@@ -32,9 +35,29 @@ varDeclaration
     : varMethod
       type
       name = ID { System.out.println("VarDec:" + $name.text); }
-      (ASSIGN (expr | orderDeclaration) { System.out.println("Operator:="); })?
+      (ASSIGN (expr | orderDeclaration | tradeClassInstance) { System.out.println("Operator:="); })?
       SEMICOLON
     ;
+
+arrDeclaration
+    : varMethod
+      type
+      (LBRACKET expr RBRACKET name = ID  {System.out.println("ArrayDec:" + $name.text + ":" + $expr.text);})?
+      (ASSIGN (expr | orderDeclaration | tradeClassInstance) { System.out.println("Operator:="); })?
+      SEMICOLON
+    ;
+
+
+tradeClassInstance:
+    ID DOT trade_preDefined_var;
+
+trade_preDefined_var
+    : BID
+    | ASK
+    |DIGITS
+    |CANDLE
+    ;
+
 
 varMethod
     : STATIC
@@ -55,6 +78,7 @@ methodDeclaration
 funcName
     :ONINIT
     | ONSTART
+    | REFRESHRATE
     | ID
     ;
 
@@ -71,8 +95,17 @@ methodBody
     ;
 
 ifStatement
-    : IF LPAR condition RPAR statement (ELSE statement)?
+    : IF { System.out.println("Conditional:if");}
+    LPAR
+    condition
+    RPAR
+    ifBody
+
     ;
+
+ifBody
+      : LBRACE statement* RBRACE (ELSE{ System.out.println("Conditional:else");} statement*)?
+      ;
 
 whileStatement
     : WHILE LPAR condition RPAR statement
@@ -110,6 +143,18 @@ condition
     : expr
     ;
 
+assignment
+    : ID ASSIGN{{ System.out.println("Operator:="); }} expr SEMICOLON
+    ;
+
+functionCall
+    : funcName LPAR RPAR SEMICOLON
+;
+
+funcArg
+    :expr (COMMA expr)*
+    ;
+
 type
     : INT
     | FLOAT
@@ -130,14 +175,6 @@ exceptionType
     : EXCEPTION
     ;
 
-//expression
-//    : assignment
-//    ;
-//
-//assignment
-//    : leftHandSide (ASSIGN | ADD_ASSIGN | MIN_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN)? expression
-//    ;
-
 expr
     : expr_logic_or
     ;
@@ -147,7 +184,7 @@ expr_logic_or
     ;
 
 expr_logic_or_
-    : OR expr_logic_and expr_logic_or_ { System.out.println("Operator: ||"); }
+    : OR expr_logic_and expr_logic_or_ { System.out.println("Operator:||"); }
     | // epsilon
     ;
 
@@ -156,7 +193,7 @@ expr_logic_and
     ;
 
 expr_logic_and_
-    : AND expr_rel_eq_neq expr_logic_and_ { System.out.println("Operator: &&"); }
+    : AND expr_rel_eq_neq expr_logic_and_ { System.out.println("Operator:&&"); }
     | // epsilon
     ;
 
@@ -165,8 +202,8 @@ expr_rel_eq_neq
     ;
 
 expr_rel_eq_neq_
-    : EQL expr_rel_cmp expr_rel_eq_neq_ { System.out.println("Operator: =="); }
-    | NEQ expr_rel_cmp expr_rel_eq_neq_ { System.out.println("Operator: !="); }
+    : EQL expr_rel_cmp expr_rel_eq_neq_ { System.out.println("Operator:=="); }
+    | NEQ expr_rel_cmp expr_rel_eq_neq_ { System.out.println("Operator:!="); }
     | // epsilon
     ;
 
@@ -175,10 +212,10 @@ expr_rel_cmp
     ;
 
 expr_rel_cmp_
-    : GTR expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator: >"); }
-    | GEQ expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator: >="); }
-    | LES expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator: <"); }
-    | LEQ expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator: <="); }
+    : GTR expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator:>"); }
+    | GEQ expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator:>="); }
+    | LES expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator:<"); }
+    | LEQ expr_arith_plus_minus expr_rel_cmp_ { System.out.println("Operator:<="); }
     | // epsilon
     ;
 
@@ -187,8 +224,8 @@ expr_arith_plus_minus
     ;
 
 expr_arith_plus_minus_
-    : PLUS expr_arith_mult_div_mod expr_arith_plus_minus_ { System.out.println("Operator: +"); }
-    | MINUS expr_arith_mult_div_mod expr_arith_plus_minus_ { System.out.println("Operator: -"); }
+    : PLUS expr_arith_mult_div_mod expr_arith_plus_minus_ { System.out.println("Operator:+"); }
+    | MINUS expr_arith_mult_div_mod expr_arith_plus_minus_ { System.out.println("Operator:-"); }
     | // epsilon
     ;
 
@@ -197,16 +234,16 @@ expr_arith_mult_div_mod
     ;
 
 expr_arith_mult_div_mod_
-    : MULT expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator: *"); }
-    | DIV expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator: /"); }
-    | MOD expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator: %"); }
+    : MULT expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator:*"); }
+    | DIV expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator:/"); }
+    | MOD expr_unary_plus_minus_not expr_arith_mult_div_mod_ { System.out.println("Operator:%"); }
     | // epsilon
     ;
 
 expr_unary_plus_minus_not
-    : PLUS expr_other { System.out.println("Operator: +"); }
-    | MINUS expr_other { System.out.println("Operator: -"); }
-    | NOT expr_other { System.out.println("Operator: !"); }
+    : PLUS expr_other { System.out.println("Operator:+"); }
+    | MINUS expr_other { System.out.println("Operator:-"); }
+    | NOT expr_other { System.out.println("Operator:!"); }
     | expr_other
     ;
 
