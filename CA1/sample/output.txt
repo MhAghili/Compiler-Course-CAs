@@ -1,2 +1,0 @@
-VarDec: balance
-VarDec: tick_counts
