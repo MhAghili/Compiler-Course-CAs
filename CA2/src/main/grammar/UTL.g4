@@ -38,7 +38,7 @@ statement returns [Statement statementRet] :
 
 varDeclaration returns [VarDeclaration varDecRet] : { $varDecRet = new VarDeclaration(); }
     allType { $varDecRet.setType($allType.allTypeRet); }
-    (LBRACK INT_LITERAL RBRACK { $varDecRet.setLength($INT_LITERAL.intLiteralRet); })?
+    (LBRACK INT_LITERAL RBRACK { $varDecRet.setLength($INT_LITERAL.int); })?
     ID (ASSIGN expression)? SEMICOLON { $varDecRet.setName($ID.text); $varDecRet.setLine($ID.line); };
 
 functionDeclaration returns [FunctionDeclaration funcDecRet] : { $funcDecRet = new FunctionDeclaration(); }
@@ -46,66 +46,118 @@ functionDeclaration returns [FunctionDeclaration funcDecRet] : { $funcDecRet = n
     ID { $funcDecRet.setName($ID.text); $funcDecRet.setLine($ID.line); }
     LPAREN (allType (LBRACK INT_LITERAL RBRACK)? ID { $funcDecRet.addArg($allType.allTypeRet, $ID.text); }
     (COMMA allType (LBRACK INT_LITERAL RBRACK)? ID { $funcDecRet.addArg($allType.allTypeRet, $ID.text); })*)?
-    RPAREN (THROW EXCEPTION)? (LBRACE (statement { $funDecRet.addStatement($statement.statementRet); })* RBRACE | statement { $funDecRet.addStatement($statement.statementRet); });
+    RPAREN (THROW EXCEPTION)? (LBRACE (statement { $funcDecRet.addStatement($statement.statementRet); })* RBRACE
+    | statement { $funcDecRet.addStatement($statement.statementRet); });
 
-mainDeclaration : VOID MAIN LPAREN RPAREN (LBRACE statement* RBRACE | statement);
 
-initDeclaration : VOID ONINIT LPAREN TRADE ID RPAREN (THROW EXCEPTION)? (LBRACE statement* RBRACE | statement);
+assignStatement returns [Assign assignStmtRet] : { $assignStmtRet = new Assign(); }
+    ID (LBRACK expression RBRACK)? assign { $assignStmtRet.setAssignType($assign.assignRet); }
+    expression SEMICOLON { $assignStmtRet.setLine($ID.line); };
 
-startDeclaration : VOID ONSTART LPAREN TRADE ID RPAREN (THROW EXCEPTION)? (LBRACE statement* RBRACE | statement);
+mainDeclaration returns [MainDeclaration mainDecRet] : { $mainDecRet = new MainDeclaration(); }
+    VOID MAIN LPAREN RPAREN (LBRACE (statement { $mainDecRet.addStatement($statement.statementRet); })* RBRACE
+    | statement { $mainDecRet.addStatement($statement.statementRet); });
 
-assignStatement : ID (LBRACK expression RBRACK)? assign expression SEMICOLON;
+continueBreakStatement returns [ContinueBreak continueBreakStmtRet] : { $continueBreakStmtRet = new ContinueBreak(); }
+    (BREAK | CONTINUE) SEMICOLON { $continueBreakStmtRet.setLine($continueBreakStmtRet.line); };
 
-ifStatement : IF LPAREN expression RPAREN (LBRACE statement* RBRACE | statement) (ELSE (LBRACE statement* RBRACE | statement))?;
+returnStatement returns [Return returnStmtRet] : { $returnStmtRet = new Return(); }
+    RETURN expression SEMICOLON { $returnStmtRet.setLine($RETURN.line); };
 
-whileStatement : WHILE LPAREN expression RPAREN (LBRACE statement* RBRACE | statement);
+tryCatchStatement returns [TryCatchStmt tryCatchStmtRet] :
+    TRY (LBRACE (statement { $tryCatchStmtRet.addThenStatement($statement.statementRet); })* RBRACE | statement)
+    (CATCH EXCEPTION ID (LBRACE (statement { $tryCatchStmtRet.addElseStatement($statement.statementRet); })* RBRACE | statement))?;
 
-forStatement: FOR LPAREN statement expression SEMICOLON expression? RPAREN (LBRACE statement* RBRACE | statement);
+forStatement returns [For forStmtRet] : { $forStmtRet = new For(); }
+    FOR LPAREN statement expression SEMICOLON expression? RPAREN
+    (LBRACE (statement { $forStmtRet.addStatement($statement.statementRet); })* RBRACE
+    | statement { $forStmtRet.addStatement($statement.statementRet); });
 
-tryCatchStatement : TRY (LBRACE statement* RBRACE | statement) (CATCH EXCEPTION ID (LBRACE statement* RBRACE | statement))?;
+initDeclaration returns [InitDeclaration initDecRet] : { $initDecRet = new InitDeclaration(); }
+    VOID ONINIT LPAREN TRADE ID RPAREN (THROW EXCEPTION)? (LBRACE (statement { $initDecRet.addStatement($statement.statementRet); })* RBRACE
+    | statement { $initDecRet.addStatement($statement.statementRet); });
 
-continueBreakStatement : (BREAK | CONTINUE) SEMICOLON;
 
-returnStatement : RETURN expression SEMICOLON;
+startDeclaration returns [StartDeclaration startDecRet] : { $startDecRet = new StartDeclaration(); }
+    VOID ONSTART LPAREN TRADE ID RPAREN (THROW EXCEPTION)? (LBRACE (statement { $startDecRet.addStatement($statement.statementRet); })* RBRACE
+    | statement { $startDecRet.addStatement($statement.statementRet); });
 
-throwStatement : THROW expression SEMICOLON;
 
-functionCall : (espetialFunction | complexType | ID) LPAREN (expression (COMMA expression)*)? RPAREN;
+ifStatement returns [If ifStmtRet] : { $ifStmtRet = new If(); }
+    IF LPAREN expression RPAREN (LBRACE (statement { $ifStmtRet.addIfBody($statement.statementRet); })* RBRACE
+    | statement { $ifStmtRet.addIfBody($statement.statementRet); })
+    (ELSE (LBRACE (statement { $ifStmtRet.addElseBody($statement.statementRet); })* RBRACE
+    | statement { $ifStmtRet.addElseBody($statement.statementRet); }))?;
 
-methodCall : ID (LBRACK expression RBRACK)? DOT espetialMethod LPAREN (expression (COMMA expression)*)? RPAREN;
+whileStatement returns [While whileStmtRet] : { $whileStmtRet = new While(); }
+    WHILE LPAREN expression RPAREN (LBRACE (statement { $whileStmtRet.addBody($statement.statementRet); })* RBRACE
+    | statement { $whileStmtRet.addBody($statement.statementRet); });
 
-expression : value
-           | expression DOT espetialVariable
-           | expression opr=(INC | DEC)
-           | opr=(NOT | MINUS | BIT_NOT | INC | DEC) expression
-           | expression opr=(MULT | DIV | MOD) expression
-           | expression opr=(PLUS | MINUS) expression
-           | expression opr=(L_SHIFT | R_SHIFT) expression
-           | expression opr=(LT | GT) expression
-           | expression opr=(EQ | NEQ) expression
-           | expression opr=(BIT_AND | BIT_OR | BIT_XOR) expression
-           | expression AND expression
-           | expression OR expression
-           | ID (LBRACK expression RBRACK)?
-           | LPAREN expression RPAREN
-           | functionCall
-           | methodCall;
+throwStatement returns [Throw throwStmtRet] : { $throwStmtRet = new Throw(); }
+    THROW expression SEMICOLON { $throwStmtRet.setLine($THROW.line); };
 
-value : INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | SELL | BUY;
+functionCall returns [FunctionCall functionCallRet] : { $functionCallRet = new FunctionCall(); }
+    (espetialFunction | complexType | ID) LPAREN (expression (COMMA expression)*)? RPAREN;
 
-primitiveType : FLOAT | DOUBLE | INT | BOOL | STRING | VOID;
+methodCall returns [MethodCall methodCallRet] : { $methodCallRet = new MethodCall(); }
+    ID (LBRACK expression RBRACK)? DOT espetialMethod LPAREN (expression (COMMA expression)*)? RPAREN;
 
-complexType: ORDER | TRADE | CANDLE | EXCEPTION;
 
-allType: primitiveType | complexType;
+expression returns [Expression expressionRet] locals [UnaryOperator op1, BinaryOperator op2, int Line] :
+             value { $expressionRet = $value.valueRet; }
+           | lexpr=expression DOT espetialVariable { $expressionRet = new MethodCall($lexpr.expressionRet, $espetialVariable.espetialVariableRet); }
+           | lexpr=expression (INC{$op1 = UnaryOperator.INC; $Line = $INC.line;} | DEC{$op1 = UnaryOperator.DEC; $Line = $DEC.line;}) { $expressionRet = new UnaryExpression($op1, $lexpr.expressionRet); $expressionRet.setLine($Line); }
+           | (NOT {$op1 = UnaryOperator.NOT; $Line = $NOT.line;} | MINUS {$op1 = UnaryOperator.MINUS; $Line = $MINUS.line;} | BIT_NOT {$op1 = UnaryOperator.BIT_NOT; $Line = $BIT_NOT.line;} | INC {$op1 = UnaryOperator.INC; $Line = $INC.line;} | DEC{$op1 = UnaryOperator.DEC; $Line = $DEC.line;}) lexpr=expression { $expressionRet = new UnaryExpression($op1, $lexpr.expressionRet); $expressionRet.setLine($Line); }
+           | lexpr=expression (MULT {$op2 = BinaryOperator.MULT; $Line = $MULT.line;} | DIV {$op2 = BinaryOperator.DIV; $Line = $DIV.line;} | MOD {$op2 = BinaryOperator.MOD; $Line = $MOD.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression (PLUS {$op2 = BinaryOperator.PLUS; $Line = $PLUS.line;} | MINUS {$op2 = BinaryOperator.MINUS; $Line = $MINUS.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression (L_SHIFT {$op2 = BinaryOperator.L_SHIFT; $Line = $L_SHIFT.line;} | R_SHIFT {$op2 = BinaryOperator.R_SHIFT; $Line = $R_SHIFT.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression (LT {$op2 = BinaryOperator.LT; $Line = $LT.line;} | GT {$op2 = BinaryOperator.GT; $Line = $GT.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression (EQ {$op2 = BinaryOperator.EQ; $Line = $EQ.line;} | NEQ {$op2 = BinaryOperator.NEQ; $Line = $NEQ.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression (BIT_AND {$op2 = BinaryOperator.BIT_AND; $Line = $BIT_AND.line;} | BIT_OR {$op2 = BinaryOperator.BIT_OR; $Line = $BIT_OR.line;} | BIT_XOR {$op2 = BinaryOperator.BIT_XOR; $Line = $BIT_XOR.line;}) rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression AND {$op2 = BinaryOperator.AND; $Line = $AND.line;} rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | lexpr=expression OR {$op2 = BinaryOperator.OR; $Line = $OR.line;} rexpr=expression { $expressionRet = new BinaryExpression($lexpr.expressionRet, $rexpr.expressionRet, $op2); $expressionRet.setLine($Line); }
+           | ID {boolean temp = false;}(LBRACK lexpr=expression RBRACK {temp = true;})? { if(temp) $expressionRet = new ArrayIdentifier($ID.text, $lexpr.expressionRet); else $expressionRet = new Identifier($ID.text); $expressionRet.setLine($ID.line); }
+           | LPAREN lexpr=expression RPAREN { $expressionRet = $lexpr.expressionRet; }
+           | functionCall { $expressionRet =  $functionCall.functionCallRet; }
+           | methodCall { $expressionRet = $methodCall.methodCallRet; };
 
-espetialFunction: REFRESH_RATE | CONNECT | OBSERVE | GET_CANDLE | TERMINATE | PRINT;
+value returns [Value valueRet] : { $valueRet = new Value(); }
+    (
+        INT_LITERAL { $valueRet.setValue($INT_LITERAL.int); }
+        |
+        FLOAT_LITERAL { $valueRet.setValue($FLOAT_LITERAL.text); } // float or text
+        |
+        STRING_LITERAL { $valueRet.setValue($STRING_LITERAL.text); }
+        |
+        SELL { $valueRet.setValue($SELL.text); }
+        |
+        BUY { $valueRet.setValue($BUY.text); }
+    );
 
-espetialVariable: ASK | BID | TIME | HIGH | LOW | DIGITS | VOLUME | TYPE | TEXT | OPEN | CLOSE;
 
-espetialMethod: OPEN | CLOSE;
+primitiveType returns [PrimitiveType primitiveTypeRet] : { $primitiveTypeRet = new PrimitiveType(); }
+    (FLOAT | DOUBLE | INT | BOOL | STRING | VOID) { $primitiveTypeRet.setType($primitiveTypeRet.text); };
 
-assign: ASSIGN | ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN;
+complexType returns [ComplexType complexTypeRet] : { $complexTypeRet = new ComplexType(); }
+    (ORDER | TRADE | CANDLE | EXCEPTION) { $complexTypeRet.setType($complexTypeRet.text); };
+
+allType returns [AllType allTypeRet] : { $allTypeRet = new AllType(); }
+    (primitiveType | complexType) { $allTypeRet.setType($allTypeRet.text); };
+
+espetialFunction returns [EspetialFunction espetialFunctionRet] : { $espetialFunctionRet = new EspetialFunction(); }
+    (REFRESH_RATE | CONNECT | OBSERVE | GET_CANDLE | TERMINATE | PRINT) { $espetialFunctionRet.setType($espetialFunctionRet.text); };
+
+espetialVariable returns [EspetialVariable espetialVariableRet] : { $espetialVariableRet = new EspetialVariable(); }
+    (ASK | BID | TIME | HIGH | LOW | DIGITS | VOLUME | TYPE | TEXT | OPEN | CLOSE) { $espetialVariableRet.setType($espetialVariableRet.text); };
+
+espetialMethod returns [EspetialMethod espetialMethodRet] : { $espetialMethodRet = new EspetialMethod(); }
+    (OPEN | CLOSE) { $espetialMethodRet.setType($espetialMethodRet.text); };
+
+assign returns [Assign assignRet] : { $assignRet = new Assign(); }
+    (ASSIGN | ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN) { $assignRet.setAssignType($assignRet.text); };
+
+
+
 
 // Lexer rules
 SPACES : [ \t\r\n]+ -> skip;
